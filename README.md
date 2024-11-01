@@ -1,7 +1,5 @@
 # UW Calendar Exporter
 
-![Demo](demo.png)
-
 ### Say Goodbye to Manual Calendar Entry! 📅
 
 Tired of manually entering each class's details into your calendar every time you register? With **UW Calendar Exporter**, you can easily export each of your University of Washington courses from your registration page to Google or Apple Calendar. No more worrying about adding locations, days, times, or repeat schedules! Just click a button for each class, and let the extension handle the rest.
