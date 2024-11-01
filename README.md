@@ -53,20 +53,14 @@ The **UW Calendar Exporter** ("we", "our", or "the extension") does not collect,
 - **No Personal Data**: This extension does not collect, store, or transmit any personally identifiable information, health information, financial data, authentication credentials, or communication records.
 - **No User Activity Tracking**: The extension does not track user activity, web history, or monitor any interaction on websites apart from its intended function on the UW registration page.
 
-### 2. **Permissions** 
-The extension requires the following permissions:
-- **scripting**: To display calendar export buttons directly on the active registration page and generate calendar events.
-
-These permissions are solely used to enhance the user experience by allowing direct calendar export options. No other sites or personal data are accessed.
-
-### 3. **Data Sharing** 
+### 2. **Data Sharing** 
 This extension does not share any user data with third parties. It only processes scheduling information on the UW registration page for display within Google or Apple Calendar.
 
-### 4. **External Links** 
+### 3. **External Links** 
 The extension may include links to Google and Apple Calendar. These external sites are governed by their own privacy policies, and we encourage users to review them.
 
-### 5. **Changes to This Privacy Policy** 
+### 4. **Changes to This Privacy Policy** 
 We reserve the right to update this privacy policy at any time. Any changes will be reflected on this GitHub repository.
 
-### 6. **Contact** 
+### 5. **Contact** 
 If you have any questions regarding this privacy policy, please contact us via the repository's issue page.
