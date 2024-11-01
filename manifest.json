@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "UW Calendar Exporter",
+  "version": "1.0",
+  "content_scripts": [
+    {
+      "matches": ["https://sdb.admin.uw.edu/students/uwnetid/register.asp"],
+      "js": ["content.js"]
+    }
+  ],
+  "icons": {
+    "128": "uw-calendar-exporter-icon.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["google-calendar-icon.png", "apple-calendar-icon.png"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
