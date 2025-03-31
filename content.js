@@ -294,15 +294,46 @@ function convertTo24HourFormat(time) {
 }
 
 function getAdjustedStartDate(quarterInfo, days, today) {
-    let startDate = getQuarterStartDate(quarterInfo, days);
-    const currentDate = today.toISOString().split('T')[0];
-
-    if (new Date(startDate) < today) {
-        startDate = currentDate;
+    // Get the quarter's official start date
+    const quarterStart = new Date(`${quarterInfo.year}-${
+        quarterInfo.quarter === 'Winter' ? '01-02' : 
+        quarterInfo.quarter === 'Spring' ? '03-30' : '09-25'
+    }`);
+    
+    // Calculate the first class date based on the course schedule
+    let firstClassDate = getQuarterStartDate(quarterInfo, days);
+    const firstClassDateObj = new Date(firstClassDate);
+    
+    // Reset hours to compare dates properly
+    today.setHours(0, 0, 0, 0);
+    
+    // If quarter hasn't started yet, use the calculated first class date
+    // If quarter has started or is starting today, use today's date if it's the right day of week
+    if (quarterStart > today) {
+        // Quarter hasn't started yet, use calculated first class date
+        return firstClassDate;
+    } else {
+        // Quarter has started or is today
+        // Get the day of week for this class
+        const classDayMap = { 'M': 1, 'T': 2, 'W': 3, 'Th': 4, 'F': 5 };
+        const classDays = days.match(/Th|M|T|W|F/g).map(day => classDayMap[day]);
+        
+        // If today is one of the class days, use today's date
+        if (classDays.includes(today.getDay())) {
+            return today.toISOString().split('T')[0];
+        }
+        
+        // If today isn't a class day, find the next occurrence
+        const todayDayOfWeek = today.getDay();
+        let nextDayOffset = Math.min(...classDays.map(day => 
+            ((day - todayDayOfWeek + 7) % 7) || 7 // Use 7 instead of 0 to avoid same-day
+        ));
+        
+        const nextClassDate = new Date(today);
+        nextClassDate.setDate(today.getDate() + nextDayOffset);
+        
+        return nextClassDate.toISOString().split('T')[0];
     }
-
-    console.log(`Adjusted start date: ${startDate}`);
-    return startDate;
 }
 
 function getQuarterStartDate({ quarter, year }, days) {
@@ -314,9 +345,16 @@ function getQuarterStartDate({ quarter, year }, days) {
 
     let startDate = quarterStartDates[quarter];
 
+    // Fix: JavaScript getDay() returns 0 for Sunday, 1 for Monday, etc.
     const dayMap = { 'M': 1, 'T': 2, 'W': 3, 'Th': 4, 'F': 5 };
     const classDays = days.match(/Th|M|T|W|F/g).map(day => dayMap[day]);
-    let nextDayOffset = Math.min(...classDays.map(day => (day - startDate.getDay() + 7) % 7));
+    
+    // Calculate days until first class occurs
+    const startDayOfWeek = startDate.getDay(); // 0-6 (Sunday-Saturday)
+    let nextDayOffset = Math.min(...classDays.map(day => {
+        // Calculate days until next occurrence of this class day
+        return (day - startDayOfWeek + 7) % 7;
+    }));
 
     startDate.setDate(startDate.getDate() + nextDayOffset);
     console.log(`Start date of the quarter: ${startDate}`);
@@ -343,7 +381,7 @@ function getQuarterEndDate({ quarter, year }) {
     const quarterEndDates = {
         'Autumn': `${year}1215T235959Z`,
         'Winter': `${year}0315T235959Z`,
-        'Spring': `${year}0601T235959Z`
+        'Spring': `${year}0607T235959Z` // Changed from 0601 to 0607
     };
 
     console.log(`Quarter end date: ${quarterEndDates[quarter]}`);
