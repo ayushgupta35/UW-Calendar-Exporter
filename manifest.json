@@ -5,17 +5,11 @@
   "description": "Say Goodbye to Manual Calendar Entry! 📅",
   "content_scripts": [
     {
-      "matches": ["https://sdb.admin.uw.edu/students/uwnetid/register.asp"],
+      "matches": ["https://register.uw.edu/register/*"],
       "js": ["content.js"]
     }
   ],
   "icons": {
     "128": "uw-calendar-exporter-icon.png"
-  },
-  "web_accessible_resources": [
-    {
-      "resources": ["google-calendar-icon.png", "apple-calendar-icon.png"],
-      "matches": ["<all_urls>"]
-    }
-  ]
+  }
 }

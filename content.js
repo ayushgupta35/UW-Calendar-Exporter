@@ -1,175 +1,315 @@
-window.onload = function () {
-    // Locate the table with the course information
-    const table = document.querySelector(".sps_table");
+/**
+ * UW Calendar Exporter
+ * This script finds a specific course table on the page, extracts course details,
+ * and adds buttons for adding events to Google Calendar and Apple Calendar.
+ */
 
-    if (!table) {
-        console.error("Course table not found.");
-        return; // Exit if the table isn't found
+console.log("UW Calendar Exporter initializing...");
+
+/**
+ * Finds the course table on the page using prioritized selectors.
+ * @returns {HTMLElement|null} The table element or null if not found.
+ */
+function findTable() {
+    console.log("Searching for course table...");
+    
+    // Try different selectors in order of specificity
+    const selectors = [
+        "table.table-mobile-responsive.mb-0.table",
+        "table.table-mobile-responsive",
+        "table.mb-0.table",
+        "table[class*='table-mobile-responsive']",
+        "table"
+    ];
+    
+    let table = null;
+    for (const selector of selectors) {
+        const found = document.querySelector(selector);
+        console.log(`Trying selector "${selector}": ${found ? "FOUND" : "not found"}`);
+        if (found) {
+            table = found;
+            break;
+        }
     }
+    
+    return table;
+}
 
-    const rows = table.querySelectorAll("tbody tr");
-
-    // Locate the first row (main header row) and extend the colspan of "Meetings"
-    const mainHeaderRow = table.querySelectorAll("tr")[0];
-    const meetingsHeader = mainHeaderRow.querySelectorAll("th")[7];
-    meetingsHeader.colSpan = 6; // Extending the colspan to include the new Apple column
-
-    // Locate the second row (where Days, Time, Location, Instructor are defined) and insert the new subheading
-    const headerRow = table.querySelectorAll("tr")[1];
-
-    // Add the Google Calendar header
+/**
+ * Processes the given table by adding headers and calendar buttons to each row.
+ * @param {HTMLElement} table - The table element to process.
+ */
+function processTable(table) {
+    console.log("Processing table:", table);
+    
+    // Skip processing if already done.
+    if (table.getAttribute("data-calendar-processed") === "true") {
+        console.log("Table already processed, skipping");
+        return;
+    }
+    
+    // Get the header row (in thead)
+    const headerRow = table.querySelector("thead tr");
+    if (!headerRow) {
+        console.error("Header row not found");
+        return;
+    }
+    
+    console.log("Found header row with", headerRow.children.length, "cells");
+    
+    // Add Google Calendar header.
     const googleHeader = document.createElement("th");
-    googleHeader.innerHTML = "Add to Google<br>Calendar";
+    googleHeader.scope = "col";
+    googleHeader.id = "registered-gcal";
+    googleHeader.innerHTML = "Google<br>Calendar";
     googleHeader.style.textAlign = "center";
     googleHeader.style.whiteSpace = "nowrap";
     headerRow.appendChild(googleHeader);
-
-    // Add the Apple Calendar header
+    console.log("Added Google Calendar header");
+    
+    // Add Apple Calendar header.
     const appleHeader = document.createElement("th");
-    appleHeader.innerHTML = "Add to Apple<br>Calendar";
+    appleHeader.scope = "col";
+    appleHeader.id = "registered-ical";
+    appleHeader.innerHTML = "Apple<br>Calendar";
     appleHeader.style.textAlign = "center";
     appleHeader.style.whiteSpace = "nowrap";
     headerRow.appendChild(appleHeader);
+    console.log("Added Apple Calendar header");
+    
+    // Process each data row.
+    const rows = table.querySelectorAll("tbody tr");
+    console.log("Found", rows.length, "data rows");
 
-    // Iterate through each row of the course schedule
-    rows.forEach(row => {
-        const cells = row.querySelectorAll("tt");
-
-        if (cells.length >= 6) {
-            const course = {
-                courseNumber: cells[1]?.innerText.trim() || "TBA",
-                courseCode: cells[2]?.innerText.trim() || "TBA",
-                courseType: cells[3]?.innerText.trim() || "TBA", // Type like LC (Lecture), LB (Lab), etc.
-                title: formatTitle(cells[5]?.innerText.trim() || "TBA"),
-                days: cells[6]?.innerText.trim() || "TBA",
-                time: cells[7]?.innerText.trim() || "TBA",
-                location: cells[8]?.innerText.trim() || "TBA",
-                instructor: formatInstructor(cells[9]?.innerText.trim() || "TBA")
-            };
-
-            if (course.time !== "TBA") {
-                // Create the Google Calendar button with tooltip
-                const googleTooltip = document.createElement("div");
-                googleTooltip.classList.add('tooltip');
-                const googleButton = document.createElement("button");
-                const googleIcon = document.createElement("img");
-                googleIcon.src = chrome.runtime.getURL('google-calendar-icon.png');
-                googleIcon.alt = 'Google Calendar Icon';
-                googleIcon.style.width = '24px';
-                googleButton.appendChild(googleIcon);
-                googleButton.classList.add('btn', 'zoom');
-                googleButton.style.backgroundColor = 'transparent';
-                googleButton.style.outline = 'none';
-                googleButton.style.border = 'none';
-                
-                googleButton.addEventListener("click", (event) => {
-                    event.preventDefault();
-                    const quarterInfo = getQuarterInfo();
-                    const eventUrl = prepareGoogleCalendarEventUrl(course, quarterInfo);
-                    window.open(eventUrl, '_blank');
-                });
-                
-                const googleTooltipText = document.createElement("span");
-                googleTooltipText.classList.add('tooltiptext');
-                googleTooltipText.innerText = 'Click to create Google Calendar event';
-                googleTooltip.appendChild(googleButton);
-                googleTooltip.appendChild(googleTooltipText);
-
-                // Create the Apple Calendar button with tooltip
-                const appleTooltip = document.createElement("div");
-                appleTooltip.classList.add('tooltip');
-                const appleButton = document.createElement("button");
-                const appleIcon = document.createElement("img");
-                appleIcon.src = chrome.runtime.getURL('apple-calendar-icon.png');
-                appleIcon.alt = 'Apple Calendar Icon';
-                appleIcon.style.width = '24px';
-                appleButton.appendChild(appleIcon);
-                appleButton.classList.add('btn', 'zoom');
-                appleButton.style.backgroundColor = 'transparent';
-                appleButton.style.outline = 'none';
-                appleButton.style.border = 'none';
-
-                appleButton.addEventListener("click", (event) => {
-                    event.preventDefault();
-                    downloadICSForCourse(course); // New function to create the ICS file dynamically
-                });
-
-                const appleTooltipText = document.createElement("span");
-                appleTooltipText.classList.add('tooltiptext');
-                appleTooltipText.innerText = 'Click to download ICS file';
-                appleTooltip.appendChild(appleButton);
-                appleTooltip.appendChild(appleTooltipText);
-
-                // Add buttons with tooltips to the row
-                const googleButtonCell = document.createElement("td");
-                googleButtonCell.style.textAlign = "center";
-                googleButtonCell.appendChild(googleTooltip);
-                row.appendChild(googleButtonCell);
-
-                const appleButtonCell = document.createElement("td");
-                appleButtonCell.style.textAlign = "center";
-                appleButtonCell.appendChild(appleTooltip);
-                row.appendChild(appleButtonCell);
-            }
+    rows.forEach((row, index) => {
+        console.log(`Processing row ${index + 1}`);
+        
+        // Get meeting information (we need to check if it has time data)
+        const meetingCell = row.querySelector("[data-content='Meeting']");
+        if (!meetingCell) {
+            console.log(`Row ${index + 1} has no meeting cell, skipping`);
+            return;
         }
-    });
+        
+        const timeElements = meetingCell.querySelectorAll("time");
+        if (timeElements.length < 2) {
+            console.log(`Row ${index + 1} has insufficient time data, adding empty cells`);
+            // Add empty cells for consistency
+            row.appendChild(document.createElement("td"));
+            row.appendChild(document.createElement("td"));
+            return;
+        }
+        
+        // Extract course details.
+        const courseCell = row.querySelector("[data-content='Course']");
+        const typeCell = row.querySelector("[data-content='Type']");
+        const instructorCell = row.querySelector("[data-content='Instructor']");
+        const daysSpan = meetingCell.querySelector("span[title]");
+        const days = daysSpan ? daysSpan.getAttribute("title") : "TBA";
+        const startTime = timeElements[0]?.innerText.trim() || "";
+        const endTime = timeElements[1]?.innerText.trim() || "";
+        const time = startTime && endTime ? `${startTime}-${endTime}` : "TBA";
+        const locationDiv = meetingCell.querySelectorAll("div")[2];
+        const location = locationDiv ? locationDiv.innerText.trim().replace("Location:", "").trim() : "TBA";
+        
+        const course = {
+            courseNumber: courseCell?.innerText.trim() || "TBA",
+            courseCode: courseCell?.innerText.trim() || "TBA",
+            courseType: typeCell?.innerText.trim() || "TBA",
+            title: courseCell?.innerText.trim() || "TBA", // Using course number as title
+            days: days,
+            time: time,
+            location: location,
+            instructor: formatInstructor(instructorCell?.getAttribute("title") || instructorCell?.innerText.trim() || "TBA")
+        };
+        
+        console.log(`Row ${index + 1} has time data, adding calendar buttons`);
+        console.log("Course data:", course);
+        
+        // Create and attach Google Calendar button.
+        const googleCell = document.createElement("td");
+        googleCell.style.textAlign = "center";
+        googleCell.setAttribute("headers", "registered-gcal");
+        const googleButton = document.createElement("button");
+        googleButton.className = "btn zoom";
+        googleButton.style.backgroundColor = "transparent";
+        googleButton.style.border = "none";
+        googleButton.style.cursor = "pointer";
+        googleButton.title = "Add to Google Calendar";
+        googleButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#4285F4">
+            <path d="M17,12v5H7v-5H17z M19,3h-1v1h-2V3h-8v1H6V3H5C3.9,3,3,3.9,3,5v14c0,1.1,0.9,2,2,2h14c1.1,0,2-0.9,2-2V5
+                 C21,3.9,20.1,3,19,3z M19,19H5V8h14V19z"/>
+        </svg>`;
+        googleButton.addEventListener("click", function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            console.log("Google Calendar button clicked");
+            try {
+                const quarterInfo = getQuarterInfo();
+                console.log("Quarter info:", quarterInfo);
+                const eventUrl = prepareGoogleCalendarEventUrl(course, quarterInfo);
+                console.log("Opening URL:", eventUrl);
+                window.open(eventUrl, '_blank');
+            } catch(error) {
+                console.error("Error creating Google Calendar event:", error);
+            }
+            return false;
+        });
+        googleCell.appendChild(googleButton);
+        row.appendChild(googleCell);
 
-    // Create a <style> element
+        // Create and attach Apple Calendar button.
+        const appleCell = document.createElement("td");
+        appleCell.style.textAlign = "center";
+        appleCell.setAttribute("headers", "registered-ical");
+        const appleButton = document.createElement("button");
+        appleButton.className = "btn zoom";
+        appleButton.style.backgroundColor = "transparent";
+        appleButton.style.border = "none";
+        appleButton.style.cursor = "pointer";
+        appleButton.title = "Add to Apple Calendar";
+        appleButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#FF3B30">
+            <path d="M17,12v5H7v-5H17z M19,3h-1v1h-2V3h-8v1H6V3H5C3.9,3,3,3.9,3,5v14c0,1.1,0.9,2,2,2h14c1.1,0,2-0.9,2-2V5 C21,3.9,20.1,3,19,3z M19,19H5V8h14V19z"/>
+        </svg>`;
+        appleButton.addEventListener("click", function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            console.log("Apple Calendar button clicked");
+            try {
+                downloadICSForCourse(course);
+            } catch(error) {
+                console.error("Error creating ICS file:", error);
+            }
+            return false;
+        });
+        appleCell.appendChild(appleButton);
+        row.appendChild(appleCell);
+    });
+    
+    // Mark table as processed.
+    table.setAttribute("data-calendar-processed", "true");
+    console.log("Table processing complete");
+    
+    // Append CSS styles for button effects.
     const style = document.createElement('style');
     style.type = 'text/css';
-
-    // Add the CSS for the zoom effect and tooltips
     style.innerHTML = `
         .zoom:hover {
             transform: scale(1.05);
             transition: transform 0.2s;
         }
-
-        .tooltip {
-            position: relative;
-            display: inline-block;
-        }
-
-        .tooltiptext {
-            font-size: 10px;
-            font-weight: bold;
-        }
-
-        .tooltip .tooltiptext {
-            visibility: hidden;
-            width: 130px;
-            background-color: #4b2a85;
-            color: #fafafa;
-            text-align: center;
-            padding: 5px;
-            border-radius: 6px;
-            position: absolute;
-            z-index: 1;
-            bottom: 125%; /* Position above the icon */
-            left: 50%;
-            margin-left: -70px;
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-
-        .tooltip:hover .tooltiptext {
-            visibility: visible;
-            opacity: 1;
+        .btn:active {
+            transform: scale(0.95);
         }
     `;
-
-    // Append the <style> element to the <head>
     document.head.appendChild(style);
-};
+}
 
+/**
+ * Initializes the table processing after the document is ready.
+ */
+function main() {
+    console.log("Main function running");
+    
+    // Try to find and process the table immediately
+    const table = findTable();
+    if (table) {
+        processTable(table);
+    } else {
+        console.log("Table not found on initial load, setting up observer");
+        
+        // Observe DOM mutations in case the table is loaded asynchronously.
+        const observer = new MutationObserver(function() {
+            const table = findTable();
+            if (table) {
+                console.log("Table found via observer");
+                processTable(table);
+                observer.disconnect();
+            }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+        // Fallback check after a delay.
+        setTimeout(function() {
+            const table = findTable();
+            if (table) {
+                console.log("Table found via timeout");
+                processTable(table);
+                observer.disconnect();
+            }
+        }, 2000);
+    }
+}
 
-// Function to create and download ICS file for Apple Calendar
+// Run initialization when the document is ready.
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", main);
+} else {
+    main();
+}
+
+/**
+ * Extracts quarter information from the page header or URL.
+ * @returns {{quarter: string, year: number}} The quarter and year data.
+ */
+function getQuarterInfo() {
+    console.log("Getting quarter info");
+    const header = document.querySelector('h1');
+    
+    if (!header) {
+        console.error("Could not find page header");
+        return { quarter: "Spring", year: new Date().getFullYear() };
+    }
+    
+    console.log("Page header:", header.innerText);
+    
+    // Try new format first: "Your Spring 2025 Schedule"
+    let match = header.innerText.match(/Your\s+(Autumn|Winter|Spring|Summer)\s+(\d{4})\s+Schedule/i);
+    
+    if (!match) {
+        // Try old format: "Registration - Spring 2024"
+        match = header.innerText.match(/Registration - (Autumn|Winter|Spring|Summer) (\d{4})/);
+    }
+    
+    if (!match) {
+        // Try to extract from URL if header doesn't contain it
+        const urlMatch = window.location.href.match(/\/([a-z]{2})(\d{2})/i);
+        if (urlMatch) {
+            const qtrCode = urlMatch[1].toLowerCase();
+            const year = "20" + urlMatch[2];
+            
+            const qtrMap = {
+                'au': 'Autumn',
+                'sp': 'Spring',
+                'wi': 'Winter',
+                'su': 'Summer'
+            };
+            
+            if (qtrMap[qtrCode]) {
+                console.log(`Extracted quarter info from URL: ${qtrMap[qtrCode]}, ${year}`);
+                return { quarter: qtrMap[qtrCode], year: parseInt(year) };
+            }
+        }
+        
+        console.error("Could not extract quarter info from header");
+        return { quarter: "Spring", year: new Date().getFullYear() };
+    }
+    
+    const quarter = match[1];
+    const year = match[2];
+    console.log(`Extracted quarter info: ${quarter}, ${year}`);
+    return { quarter, year };
+}
+
+/**
+ * Creates and triggers the download of an ICS file for Apple Calendar.
+ * @param {Object} course - The course object containing event details.
+ */
 function downloadICSForCourse(course) {
     const quarterInfo = getQuarterInfo();
     const { startTime, endTime } = convertTime(course.time, course.days, quarterInfo);
 
     const event = {
-        title: `${course.courseNumber}: ${course.title} w/ ${course.instructor}`,
+        title: `${course.courseNumber}: ${course.title}`,
         description: `Instructor: ${course.instructor}`,
         location: `University of Washington, ${course.location}`,
         start: startTime.replace(/-|:/g, ''),
@@ -180,7 +320,7 @@ function downloadICSForCourse(course) {
 
     const icsContent = `BEGIN:VCALENDAR
 VERSION:2.0
-PRODID:-//MyApp//EN
+PRODID:-//UW Calendar Exporter//EN
 CALSCALE:GREGORIAN
 BEGIN:VEVENT
 DTSTART;TZID=${event.timezone}:${event.start}
@@ -195,21 +335,18 @@ END:VCALENDAR`;
     const blob = new Blob([icsContent], { type: 'text/calendar' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = 'event.ics';
+    link.download = `${course.courseNumber.replace(/\s+/g, '_')}_calendar.ics`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 }
 
-// Extract quarter info from the page
-function getQuarterInfo() {
-    const header = document.querySelector('h1').innerText;
-    const [_, quarter, year] = header.match(/Registration - (Autumn|Winter|Spring) (\d{4})/);
-    console.log(`Extracted quarter info: ${quarter}, ${year}`);
-    return { quarter, year };
-}
-
-// Prepare Google Calendar Event URL
+/**
+ * Prepares a Google Calendar event URL for the given course.
+ * @param {Object} course - The course object containing event details.
+ * @param {Object} quarterInfo - The quarter information for the event.
+ * @returns {string} The URL for creating a Google Calendar event.
+ */
 function prepareGoogleCalendarEventUrl(course, quarterInfo) {
     const { startTime, endTime } = convertTime(course.time, course.days, quarterInfo);
 
@@ -218,10 +355,10 @@ function prepareGoogleCalendarEventUrl(course, quarterInfo) {
     const baseUrl = "https://calendar.google.com/calendar/r/eventedit";
 
     const params = new URLSearchParams({
-        text: `${course.courseNumber}: ${course.title} w/ ${course.instructor}`,
+        text: `${course.courseNumber}: ${course.title}`,
         dates: `${startTime.replace(/-|:/g, '')}/${endTime.replace(/-|:/g, '')}`,
         ctz: 'America/Los_Angeles',
-        details: `Instructor: ${course.instructor}`,
+        details: course.instructor === "TBA" ? "" : `Instructor: ${course.instructor}`,
         location: `University of Washington, ${course.location}`,
         recur: `RRULE:FREQ=WEEKLY;BYDAY=${convertDaysToRecurrence(course.days)};UNTIL=${getQuarterEndDate(quarterInfo)}`
     });
@@ -233,6 +370,13 @@ function prepareGoogleCalendarEventUrl(course, quarterInfo) {
     return eventUrl;
 }
 
+/**
+ * Converts a course's time string into start and end times based on the quarter and class days.
+ * @param {string} time - The raw time string.
+ * @param {string} days - The days string.
+ * @param {Object} quarterInfo - The quarter information.
+ * @returns {{startTime: string, endTime: string}} The formatted start and end times.
+ */
 function convertTime(time, days, quarterInfo) {
     console.log(`Raw time before processing: ${time}`);
     time = time.replace(/&nbsp;/g, '').trim();
@@ -264,106 +408,128 @@ function convertTime(time, days, quarterInfo) {
     return { startTime, endTime };
 }
 
+/**
+ * Converts a given time string to 24-hour format.
+ * @param {string} time - The time string (e.g., "10:00", "11:20am").
+ * @returns {string} The time in 24-hour HH:mm format.
+ */
 function convertTo24HourFormat(time) {
-    let hour, minutes;
-
-    time = time.replace(/[^\d]/g, ''); // Ensure time is numeric
-    console.log(`Time after removing non-numeric characters: ${time}`);
-
-    if (time.length === 4) {
-        hour = parseInt(time.slice(0, 2), 10);
-        minutes = parseInt(time.slice(2), 10);
-    } else if (time.length === 3) {
-        hour = parseInt(time.slice(0, 1), 10);
-        minutes = parseInt(time.slice(1), 10);
+    // Handle cases like "10:00" and "11:20am"
+    const timeStr = time.trim().toLowerCase();
+    let hour, minute;
+    
+    // Check if the time already has a colon (e.g., "10:00")
+    if (timeStr.includes(':')) {
+        [hour, minute] = timeStr.split(':');
+        hour = parseInt(hour, 10);
+        minute = parseInt(minute.replace(/[^\d]/g, ''), 10);
     } else {
-        console.error(`Invalid time format: ${time}`);
-        return "00:00";
+        // Handle cases like "1130am"
+        const digits = timeStr.replace(/[^\d]/g, '');
+        if (digits.length === 4) {
+            hour = parseInt(digits.substring(0, 2), 10);
+            minute = parseInt(digits.substring(2), 10);
+        } else if (digits.length === 3) {
+            hour = parseInt(digits.substring(0, 1), 10);
+            minute = parseInt(digits.substring(1), 10);
+        } else {
+            console.error(`Invalid time format: ${time}`);
+            return "00:00";
+        }
     }
-
-    console.log(`Extracted hour: ${hour}, Extracted minutes: ${minutes}`);
-
-    if (hour >= 8 && hour <= 11) {
-        // Morning times are AM
-    } else if (hour >= 1 && hour <= 9) {
-        hour += 12; // Convert to PM
+    
+    // Adjust for AM/PM
+    if (timeStr.includes('pm') && hour < 12) {
+        hour += 12;
+    } else if (timeStr.includes('am') && hour === 12) {
+        hour = 0;
     }
-
-    console.log(`Converted hour to 24-hour format: ${hour}`);
-    return `${String(hour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+    
+    // Default handling for times without am/pm
+    // Assume 8-11 are AM, 1-7 are PM
+    if (!timeStr.includes('am') && !timeStr.includes('pm')) {
+        if (hour >= 8 && hour <= 11) {
+            // Morning times are AM (as is)
+        } else if (hour >= 1 && hour <= 7) {
+            hour += 12; // Convert to PM
+        }
+    }
+    
+    return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
+/**
+ * Determines the adjusted start date for the first class based on the quarter start and class days.
+ * @param {Object} quarterInfo - The quarter information.
+ * @param {string} days - The days string.
+ * @param {Date} today - The current date.
+ * @returns {string} The start date in YYYY-MM-DD format.
+ */
 function getAdjustedStartDate(quarterInfo, days, today) {
-    // Get the quarter's official start date
-    const quarterStart = new Date(`${quarterInfo.year}-${
-        quarterInfo.quarter === 'Winter' ? '01-02' : 
-        quarterInfo.quarter === 'Spring' ? '03-30' : '09-25'
-    }`);
+    // Quarter start dates
+    const quarterStartMap = {
+        'Winter': `${quarterInfo.year}-01-03`,
+        'Spring': `${quarterInfo.year}-03-27`, 
+        'Summer': `${quarterInfo.year}-06-19`,
+        'Autumn': `${quarterInfo.year}-09-27`
+    };
     
-    // Calculate the first class date based on the course schedule
-    let firstClassDate = getQuarterStartDate(quarterInfo, days);
-    const firstClassDateObj = new Date(firstClassDate);
+    const quarterStart = new Date(quarterStartMap[quarterInfo.quarter] || `${quarterInfo.year}-09-27`);
     
-    // Reset hours to compare dates properly
-    today.setHours(0, 0, 0, 0);
+    // Convert days string to day numbers
+    const dayMap = { 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'M': 1, 'T': 2, 'W': 3, 'Th': 4, 'F': 5 };
+    const classDaysRaw = days.match(/Monday|Tuesday|Wednesday|Thursday|Friday|M|T|W|Th|F/g) || [];
+    const classDays = classDaysRaw.map(day => dayMap[day]);
     
-    // If quarter hasn't started yet, use the calculated first class date
-    // If quarter has started or is starting today, use today's date if it's the right day of week
-    if (quarterStart > today) {
-        // Quarter hasn't started yet, use calculated first class date
-        return firstClassDate;
-    } else {
-        // Quarter has started or is today
-        // Get the day of week for this class
-        const classDayMap = { 'M': 1, 'T': 2, 'W': 3, 'Th': 4, 'F': 5 };
-        const classDays = days.match(/Th|M|T|W|F/g).map(day => classDayMap[day]);
-        
-        // If today is one of the class days, use today's date
-        if (classDays.includes(today.getDay())) {
+    // If today is after quarter start and is a class day, use today
+    if (today > quarterStart) {
+        const todayDay = today.getDay(); // 0=Sun, 1=Mon, etc.
+        if (classDays.includes(todayDay)) {
             return today.toISOString().split('T')[0];
         }
         
-        // If today isn't a class day, find the next occurrence
-        const todayDayOfWeek = today.getDay();
-        let nextDayOffset = Math.min(...classDays.map(day => 
-            ((day - todayDayOfWeek + 7) % 7) || 7 // Use 7 instead of 0 to avoid same-day
-        ));
-        
-        const nextClassDate = new Date(today);
-        nextClassDate.setDate(today.getDate() + nextDayOffset);
-        
-        return nextClassDate.toISOString().split('T')[0];
+        // Find next class day
+        let nextDay = new Date(today);
+        let daysToAdd = 1;
+        while (daysToAdd < 8) {
+            nextDay = new Date(today);
+            nextDay.setDate(today.getDate() + daysToAdd);
+            if (classDays.includes(nextDay.getDay())) {
+                return nextDay.toISOString().split('T')[0];
+            }
+            daysToAdd++;
+        }
     }
-}
-
-function getQuarterStartDate({ quarter, year }, days) {
-    const quarterStartDates = {
-        'Autumn': new Date(`${year}-09-25`),
-        'Winter': new Date(`${year}-01-02`),
-        'Spring': new Date(`${year}-03-30`)
-    };
-
-    let startDate = quarterStartDates[quarter];
-
-    // Fix: JavaScript getDay() returns 0 for Sunday, 1 for Monday, etc.
-    const dayMap = { 'M': 1, 'T': 2, 'W': 3, 'Th': 4, 'F': 5 };
-    const classDays = days.match(/Th|M|T|W|F/g).map(day => dayMap[day]);
     
-    // Calculate days until first class occurs
-    const startDayOfWeek = startDate.getDay(); // 0-6 (Sunday-Saturday)
-    let nextDayOffset = Math.min(...classDays.map(day => {
-        // Calculate days until next occurrence of this class day
-        return (day - startDayOfWeek + 7) % 7;
-    }));
-
-    startDate.setDate(startDate.getDate() + nextDayOffset);
-    console.log(`Start date of the quarter: ${startDate}`);
-
-    return startDate.toISOString().split('T')[0];
+    // Otherwise find first class day from quarter start
+    let firstClassDate = new Date(quarterStart);
+    let daysChecked = 0;
+    
+    // Find the first occurrence of a class day after the quarter start
+    while (daysChecked < 7) {
+        if (classDays.includes(firstClassDate.getDay())) {
+            return firstClassDate.toISOString().split('T')[0];
+        }
+        firstClassDate.setDate(firstClassDate.getDate() + 1);
+        daysChecked++;
+    }
+    
+    // Fallback: return quarter start
+    return quarterStart.toISOString().split('T')[0];
 }
 
+/**
+ * Converts course days into a recurrence rule format.
+ * @param {string} days - The days string.
+ * @returns {string} The recurrence rule days (e.g., "MO,TU").
+ */
 function convertDaysToRecurrence(days) {
     const dayMap = {
+        'Monday': 'MO',
+        'Tuesday': 'TU',
+        'Wednesday': 'WE',
+        'Thursday': 'TH',
+        'Friday': 'FR',
         'M': 'MO',
         'T': 'TU',
         'W': 'WE',
@@ -371,23 +537,35 @@ function convertDaysToRecurrence(days) {
         'F': 'FR'
     };
 
-    let rruleDays = days.match(/Th|M|T|W|F/g).map(day => dayMap[day] || '').join(',');
+    const dayMatches = days.match(/Monday|Tuesday|Wednesday|Thursday|Friday|M|T|W|Th|F/g) || [];
+    let rruleDays = dayMatches.map(day => dayMap[day]).join(',');
     console.log(`Recurrence rule days: ${rruleDays}`);
 
-    return rruleDays;
+    return rruleDays || 'MO';
 }
 
+/**
+ * Retrieves the quarter end date in a format suitable for calendar recurrence rules.
+ * @param {{quarter: string, year: number}} info - The quarter information.
+ * @returns {string} The quarter end date in the format YYYYMMDDTHHmmssZ.
+ */
 function getQuarterEndDate({ quarter, year }) {
     const quarterEndDates = {
         'Autumn': `${year}1215T235959Z`,
-        'Winter': `${year}0315T235959Z`,
-        'Spring': `${year}0607T235959Z` // Changed from 0601 to 0607
+        'Winter': `${year}0320T235959Z`,
+        'Spring': `${year}0607T235959Z`,
+        'Summer': `${year}0815T235959Z`
     };
 
     console.log(`Quarter end date: ${quarterEndDates[quarter]}`);
-    return quarterEndDates[quarter];
+    return quarterEndDates[quarter] || `${year}1215T235959Z`;
 }
 
+/**
+ * Formats the instructor's name.
+ * @param {string} name - The raw instructor name.
+ * @returns {string} The formatted name.
+ */
 function formatInstructor(name) {
     if (name.includes(",")) {
         const [lastName, firstName] = name.split(",").map(s => s.trim());
@@ -396,6 +574,11 @@ function formatInstructor(name) {
     return name;
 }
 
+/**
+ * Formats a title string to have each word capitalized appropriately.
+ * @param {string} title - The raw title.
+ * @returns {string} The formatted title.
+ */
 function formatTitle(title) {
     return title.split(' ').map(word => {
         return word === word.toUpperCase() ? word : word[0].toUpperCase() + word.slice(1).toLowerCase();
