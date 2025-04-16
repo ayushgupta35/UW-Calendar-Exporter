@@ -1,6 +1,7 @@
 # UW Calendar Exporter
 
 ![Demo](demo1.png)
+![Demo](demo2.png)
 
 ### Say Goodbye to Manual Calendar Entry! 📅
 
