@@ -109,7 +109,7 @@ function processTable(table) {
         const startTime = timeElements[0]?.innerText.trim() || "";
         const endTime = timeElements[1]?.innerText.trim() || "";
         const time = startTime && endTime ? `${startTime}-${endTime}` : "TBA";
-        const locationDiv = meetingCell.querySelectorAll("div")[2];
+        const locationDiv = meetingCell.querySelectorAll("div")[3];
         const location = locationDiv ? locationDiv.innerText.trim().replace("Location:", "").trim() : "TBA";
         
         const course = {
@@ -353,7 +353,7 @@ function downloadICSForCourse(course) {
     const { startTime, endTime } = convertTime(course.time, course.days, quarterInfo);
 
     const event = {
-        title: `${course.courseNumber}: ${course.title}`,
+        title: course.courseNumber, // Changed from `${course.courseNumber}: ${course.title}`
         description: `Instructor: ${course.instructor}`,
         location: `University of Washington, ${course.location}`,
         start: startTime.replace(/-|:/g, ''),
@@ -394,12 +394,10 @@ END:VCALENDAR`;
 function prepareGoogleCalendarEventUrl(course, quarterInfo) {
     const { startTime, endTime } = convertTime(course.time, course.days, quarterInfo);
 
-    console.log(`Start time: ${startTime}, End time: ${endTime}`);
-
     const baseUrl = "https://calendar.google.com/calendar/r/eventedit";
 
     const params = new URLSearchParams({
-        text: `${course.courseNumber}: ${course.title}`,
+        text: course.courseNumber, // Changed from `${course.courseNumber}: ${course.title}`
         dates: `${startTime.replace(/-|:/g, '')}/${endTime.replace(/-|:/g, '')}`,
         ctz: 'America/Los_Angeles',
         details: course.instructor === "TBA" ? "" : `Instructor: ${course.instructor}`,
@@ -407,11 +405,7 @@ function prepareGoogleCalendarEventUrl(course, quarterInfo) {
         recur: `RRULE:FREQ=WEEKLY;BYDAY=${convertDaysToRecurrence(course.days)};UNTIL=${getQuarterEndDate(quarterInfo)}`
     });
 
-    const eventUrl = `${baseUrl}?${params.toString()}`;
-
-    console.log(`Google Calendar Event URL: ${eventUrl}`);
-
-    return eventUrl;
+    return `${baseUrl}?${params.toString()}`;
 }
 
 /**
