@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "UW Calendar Exporter",
-  "version": "1.2",
+  "version": "2.1",
   "description": "Say Goodbye to Manual Calendar Entry! 📅",
   "content_scripts": [
     {

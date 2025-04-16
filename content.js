@@ -136,10 +136,8 @@ function processTable(table) {
         googleButton.style.border = "none";
         googleButton.style.cursor = "pointer";
         googleButton.title = "Add to Google Calendar";
-        googleButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#4285F4">
-            <path d="M17,12v5H7v-5H17z M19,3h-1v1h-2V3h-8v1H6V3H5C3.9,3,3,3.9,3,5v14c0,1.1,0.9,2,2,2h14c1.1,0,2-0.9,2-2V5
-                 C21,3.9,20.1,3,19,3z M19,19H5V8h14V19z"/>
-        </svg>`;
+        // Use a web image instead of inline SVG for the Google Calendar icon.
+        googleButton.innerHTML = `<img src="https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Google_Calendar_icon_%282020%29.svg/2048px-Google_Calendar_icon_%282020%29.svg.png" alt="Google Calendar Icon" width="24" height="24">`;
         googleButton.addEventListener("click", function(event) {
             event.preventDefault();
             event.stopPropagation();
@@ -155,6 +153,8 @@ function processTable(table) {
             }
             return false;
         });
+        // Attach a custom tooltip to the Google button.
+        addTooltip(googleButton, googleButton.title);
         googleCell.appendChild(googleButton);
         row.appendChild(googleCell);
 
@@ -168,9 +168,8 @@ function processTable(table) {
         appleButton.style.border = "none";
         appleButton.style.cursor = "pointer";
         appleButton.title = "Add to Apple Calendar";
-        appleButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#FF3B30">
-            <path d="M17,12v5H7v-5H17z M19,3h-1v1h-2V3h-8v1H6V3H5C3.9,3,3,3.9,3,5v14c0,1.1,0.9,2,2,2h14c1.1,0,2-0.9,2-2V5 C21,3.9,20.1,3,19,3z M19,19H5V8h14V19z"/>
-        </svg>`;
+        // Use a web image instead of inline SVG for the Apple Calendar icon.
+        appleButton.innerHTML = `<img src="https://help.apple.com/assets/65D689DF13D1B1E17703916F/65D689E0D302CF88600FDD25/en_US/941b3852f089696217cabe420c7a459f.png" alt="Apple Calendar Icon" width="24" height="24">`;
         appleButton.addEventListener("click", function(event) {
             event.preventDefault();
             event.stopPropagation();
@@ -182,6 +181,8 @@ function processTable(table) {
             }
             return false;
         });
+        // Attach a custom tooltip to the Apple button.
+        addTooltip(appleButton, appleButton.title);
         appleCell.appendChild(appleButton);
         row.appendChild(appleCell);
     });
@@ -203,6 +204,49 @@ function processTable(table) {
         }
     `;
     document.head.appendChild(style);
+}
+
+/**
+ * Attaches custom tooltip functionality to an element.
+ * When the element is hovered, a tooltip will follow the cursor.
+ * @param {HTMLElement} element - The target element.
+ * @param {string} tooltipText - The text to display in the tooltip.
+ */
+function addTooltip(element, tooltipText) {
+    let tooltip;
+    
+    element.addEventListener("mouseenter", function(e) {
+        tooltip = document.createElement('div');
+        tooltip.innerText = tooltipText;
+        tooltip.className = 'custom-tooltip';
+        // Basic styling for the tooltip.
+        tooltip.style.position = 'absolute';
+        tooltip.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+        tooltip.style.color = '#fff';
+        tooltip.style.padding = '4px 8px';
+        tooltip.style.borderRadius = '4px';
+        tooltip.style.fontSize = '12px';
+        tooltip.style.pointerEvents = 'none';
+        tooltip.style.zIndex = '1000';
+        document.body.appendChild(tooltip);
+        // Position the tooltip near the mouse.
+        tooltip.style.left = (e.pageX + 8) + "px";
+        tooltip.style.top = (e.pageY + 8) + "px";
+    });
+    
+    element.addEventListener("mousemove", function(e) {
+        if (tooltip) {
+            tooltip.style.left = (e.pageX + 8) + "px";
+            tooltip.style.top = (e.pageY + 8) + "px";
+        }
+    });
+    
+    element.addEventListener("mouseleave", function() {
+        if (tooltip) {
+            document.body.removeChild(tooltip);
+            tooltip = null;
+        }
+    });
 }
 
 /**
