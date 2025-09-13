@@ -1,0 +1,18 @@
+{
+  "name": "uw-calendar-exporter",
+  "version": "1.0.0",
+  "description": "UW Calendar Exporter Chrome Extension",
+  "main": "content.js",
+  "scripts": {
+    "test": "node test-calendar-parser.js",
+    "test:live": "node test-live-calendar.js",
+    "view-dates": "node view-quarter-dates.js"
+  },
+  "dependencies": {
+    "jsdom": "^23.0.1"
+  },
+  "devDependencies": {},
+  "keywords": ["chrome-extension", "calendar", "university-of-washington"],
+  "author": "",
+  "license": "MIT"
+}

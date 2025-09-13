@@ -6,8 +6,14 @@
   "content_scripts": [
     {
       "matches": ["https://register.uw.edu/register/*"],
-      "js": ["content.js"]
+      "js": ["calendar-parser.js", "content.js"]
     }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "host_permissions": [
+    "https://www.washington.edu/students/reg/*"
   ],
   "icons": {
     "128": "uw-calendar-exporter-icon.png"

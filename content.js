@@ -142,15 +142,17 @@ function processTable(table) {
             event.preventDefault();
             event.stopPropagation();
             console.log("Google Calendar button clicked");
-            try {
-                const quarterInfo = getQuarterInfo();
-                console.log("Quarter info:", quarterInfo);
-                const eventUrl = prepareGoogleCalendarEventUrl(course, quarterInfo);
-                console.log("Opening URL:", eventUrl);
-                window.open(eventUrl, '_blank');
-            } catch(error) {
-                console.error("Error creating Google Calendar event:", error);
-            }
+            (async () => {
+                try {
+                    const quarterInfo = getQuarterInfo();
+                    console.log("Quarter info:", quarterInfo);
+                    const eventUrl = await prepareGoogleCalendarEventUrl(course, quarterInfo);
+                    console.log("Opening URL:", eventUrl);
+                    window.open(eventUrl, '_blank');
+                } catch(error) {
+                    console.error("Error creating Google Calendar event:", error);
+                }
+            })();
             return false;
         });
         // Attach a custom tooltip to the Google button.
@@ -348,9 +350,9 @@ function getQuarterInfo() {
  * Creates and triggers the download of an ICS file for Apple Calendar.
  * @param {Object} course - The course object containing event details.
  */
-function downloadICSForCourse(course) {
+async function downloadICSForCourse(course) {
     const quarterInfo = getQuarterInfo();
-    const { startTime, endTime } = convertTime(course.time, course.days, quarterInfo);
+    const { startTime, endTime } = await convertTime(course.time, course.days, quarterInfo);
 
     const event = {
         title: course.courseNumber, // Changed from `${course.courseNumber}: ${course.title}`
@@ -359,7 +361,7 @@ function downloadICSForCourse(course) {
         start: startTime.replace(/-|:/g, ''),
         end: endTime.replace(/-|:/g, ''),
         timezone: "America/Los_Angeles",
-        repeatRule: `FREQ=WEEKLY;BYDAY=${convertDaysToRecurrence(course.days)};UNTIL=${getQuarterEndDate(quarterInfo)}`
+    repeatRule: `FREQ=WEEKLY;BYDAY=${convertDaysToRecurrence(course.days)};UNTIL=${await getQuarterEndDate(quarterInfo)}`
     };
 
     const icsContent = `BEGIN:VCALENDAR
@@ -391,8 +393,8 @@ END:VCALENDAR`;
  * @param {Object} quarterInfo - The quarter information for the event.
  * @returns {string} The URL for creating a Google Calendar event.
  */
-function prepareGoogleCalendarEventUrl(course, quarterInfo) {
-    const { startTime, endTime } = convertTime(course.time, course.days, quarterInfo);
+async function prepareGoogleCalendarEventUrl(course, quarterInfo) {
+    const { startTime, endTime } = await convertTime(course.time, course.days, quarterInfo);
 
     const baseUrl = "https://calendar.google.com/calendar/r/eventedit";
 
@@ -402,7 +404,7 @@ function prepareGoogleCalendarEventUrl(course, quarterInfo) {
         ctz: 'America/Los_Angeles',
         details: course.instructor === "TBA" ? "" : `Instructor: ${course.instructor}`,
         location: `University of Washington, ${course.location}`,
-        recur: `RRULE:FREQ=WEEKLY;BYDAY=${convertDaysToRecurrence(course.days)};UNTIL=${getQuarterEndDate(quarterInfo)}`
+    recur: `RRULE:FREQ=WEEKLY;BYDAY=${convertDaysToRecurrence(course.days)};UNTIL=${await getQuarterEndDate(quarterInfo)}`
     });
 
     return `${baseUrl}?${params.toString()}`;
@@ -415,7 +417,7 @@ function prepareGoogleCalendarEventUrl(course, quarterInfo) {
  * @param {Object} quarterInfo - The quarter information.
  * @returns {{startTime: string, endTime: string}} The formatted start and end times.
  */
-function convertTime(time, days, quarterInfo) {
+async function convertTime(time, days, quarterInfo) {
     console.log(`Raw time before processing: ${time}`);
     time = time.replace(/&nbsp;/g, '').trim();
     console.log(`Sanitized time: ${time}`);
@@ -434,7 +436,7 @@ function convertTime(time, days, quarterInfo) {
     console.log(`Converted start time: ${convertedStartTime}, Converted end time: ${convertedEndTime}`);
 
     const today = new Date();
-    const firstClassDate = getAdjustedStartDate(quarterInfo, days, today);
+    const firstClassDate = await getAdjustedStartDate(quarterInfo, days, today);
 
     console.log(`First class date: ${firstClassDate}`);
 
@@ -503,16 +505,39 @@ function convertTo24HourFormat(time) {
  * @param {Date} today - The current date.
  * @returns {string} The start date in YYYY-MM-DD format.
  */
-function getAdjustedStartDate(quarterInfo, days, today) {
-    // Quarter start dates
-    const quarterStartMap = {
-        'Winter': `${quarterInfo.year}-01-03`,
-        'Spring': `${quarterInfo.year}-03-27`, 
-        'Summer': `${quarterInfo.year}-06-19`,
-        'Autumn': `${quarterInfo.year}-09-27`
-    };
-    
-    const quarterStart = new Date(quarterStartMap[quarterInfo.quarter] || `${quarterInfo.year}-09-27`);
+async function getAdjustedStartDate(quarterInfo, days, today) {
+    // Ensure year is a number
+    const yearNum = typeof quarterInfo.year === 'string' ? parseInt(quarterInfo.year) : quarterInfo.year;
+    const calendarUrl = getCalendarUrl(yearNum);
+    console.log('getAdjustedStartDate: quarterInfo', quarterInfo);
+    console.log('getAdjustedStartDate: yearNum', yearNum);
+    console.log('getAdjustedStartDate: calendarUrl', calendarUrl);
+    let quarterStart = null;
+    // Use fetch to get the calendar page and parse the table
+    try {
+        const html = await new Promise((resolve, reject) => {
+            chrome.runtime.sendMessage({ action: 'fetchCalendar', url: calendarUrl }, response => {
+                if (response && response.success) {
+                    resolve(response.html);
+                } else {
+                    reject(response && response.error ? response.error : 'Unknown error');
+                }
+            });
+        });
+        quarterStart = parseQuarterStartDate(html, quarterInfo.quarter);
+    } catch (e) {
+        console.error('Failed to fetch calendar:', e);
+    }
+    if (!quarterStart) {
+        // Fallback to hardcoded
+        const fallbackMap = {
+            'Winter': `${quarterInfo.year}-01-03`,
+            'Spring': `${quarterInfo.year}-03-27`,
+            'Summer': `${quarterInfo.year}-06-19`,
+            'Autumn': `${quarterInfo.year}-09-27`
+        };
+        quarterStart = new Date(fallbackMap[quarterInfo.quarter] || `${quarterInfo.year}-09-27`);
+    }
     
     // Convert days string to day numbers
     const dayMap = { 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'M': 1, 'T': 2, 'W': 3, 'Th': 4, 'F': 5 };
@@ -587,16 +612,46 @@ function convertDaysToRecurrence(days) {
  * @param {{quarter: string, year: number}} info - The quarter information.
  * @returns {string} The quarter end date in the format YYYYMMDDTHHmmssZ.
  */
-function getQuarterEndDate({ quarter, year }) {
-    const quarterEndDates = {
-        'Autumn': `${year}1215T235959Z`,
-        'Winter': `${year}0320T235959Z`,
-        'Spring': `${year}0607T235959Z`,
-        'Summer': `${year}0815T235959Z`
-    };
-
-    console.log(`Quarter end date: ${quarterEndDates[quarter]}`);
-    return quarterEndDates[quarter] || `${year}1215T235959Z`;
+async function getQuarterEndDate({ quarter, year }) {
+    // Ensure year is a number
+    const yearNum = typeof year === 'string' ? parseInt(year) : year;
+    const calendarUrl = getCalendarUrl(yearNum);
+    console.log('getQuarterEndDate: quarter', quarter);
+    console.log('getQuarterEndDate: yearNum', yearNum);
+    console.log('getQuarterEndDate: calendarUrl', calendarUrl);
+    let quarterEnd = null;
+    try {
+        const html = await new Promise((resolve, reject) => {
+            chrome.runtime.sendMessage({ action: 'fetchCalendar', url: calendarUrl }, response => {
+                if (response && response.success) {
+                    resolve(response.html);
+                } else {
+                    reject(response && response.error ? response.error : 'Unknown error');
+                }
+            });
+        });
+        const parsedDate = parseQuarterEndDate(html, quarter);
+        if (parsedDate) {
+            // Format for calendar recurrence: YYYYMMDDT235959Z
+            const yyyy = parsedDate.getFullYear();
+            const mm = String(parsedDate.getMonth() + 1).padStart(2, '0');
+            const dd = String(parsedDate.getDate()).padStart(2, '0');
+            quarterEnd = `${yyyy}${mm}${dd}T235959Z`;
+        }
+    } catch (e) {
+        console.error('Failed to fetch calendar:', e);
+    }
+    if (!quarterEnd) {
+        // Fallback to hardcoded
+        const fallbackEnd = {
+            'Autumn': `${year}1215T235959Z`,
+            'Winter': `${year}0320T235959Z`,
+            'Spring': `${year}0607T235959Z`,
+            'Summer': `${year}0815T235959Z`
+        };
+        quarterEnd = fallbackEnd[quarter] || `${year}1215T235959Z`;
+    }
+    return quarterEnd;
 }
 
 /**
